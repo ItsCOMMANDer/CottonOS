@@ -3,6 +3,8 @@
 
 #include <time.h>
 
+#include <math.h>
+
 static int log_level = 3;
 
 struct timespec getUpTime() {
@@ -11,7 +13,7 @@ struct timespec getUpTime() {
     return uptime;
 }
 
-int log_getLevel() {return log_getLevel;}
+int log_getLevel() {return log_level;}
 void log_setLevel(int level) {log_level = level;}
 
 void log_debug(const char* tag, const char* text, ...) {
@@ -19,9 +21,9 @@ void log_debug(const char* tag, const char* text, ...) {
     va_list args;
     va_start(args, text);
     struct timespec uptime = getUpTime();
-    printf("\e[38;2;180;171;171m[%5i.%06i] %s: ", uptime.tv_sec, uptime.tv_nsec, tag);
+    printf("\e[38;2;180;171;171m[%5li.%06i] %s: ", uptime.tv_sec, (int)(uptime.tv_nsec / powl(10, (((int)log10l(uptime.tv_nsec) + 1) - 6))), tag);
     vprintf(text, args);
-    printf("\n");
+    printf("\e[38;2;255;255;255m\n");
     va_end(args);
 }
 
@@ -30,9 +32,9 @@ void log_info(const char* tag, const char* text, ...) {
     va_list args;
     va_start(args, text);
     struct timespec uptime = getUpTime();
-    printf("\e[38;2;0;255;0m[%5i.%06i] %s: ", uptime.tv_sec, uptime.tv_nsec, tag);
+    printf("\e[38;2;0;255;0m[%5li.%06i] %s: ", uptime.tv_sec, (int)(uptime.tv_nsec / powl(10, (((int)log10l(uptime.tv_nsec) + 1) - 6))), tag);
     vprintf(text, args);
-    printf("\n");
+    printf("\e[38;2;255;255;255m\n");
     va_end(args);
 }
 
@@ -41,9 +43,9 @@ void log_warn(const char* tag, const char* text, ...) {
     va_list args;
     va_start(args, text);
     struct timespec uptime = getUpTime();
-    printf("\e[38;2;255;255;0m[%5i.%06i] %s: ",  uptime.tv_sec, uptime.tv_nsec, tag);
+    printf("\e[38;2;255;255;0m[%5li.%06i] %s: ",  uptime.tv_sec, (int)(uptime.tv_nsec / powl(10, (((int)log10l(uptime.tv_nsec) + 1) - 6))), tag);
     vprintf(text, args);
-    printf("\n");
+    printf("\e[38;2;255;255;255m\n");
     va_end(args);
 }
 
@@ -52,8 +54,9 @@ void log_error(const char* tag, const char* text, ...) {
     va_list args;
     va_start(args, text);
     struct timespec uptime = getUpTime();
-    printf("\e[38;2;255;0;0m[%5i.%06i] %s: ", uptime.tv_sec, uptime.tv_nsec, tag);
+    printf("\e[38;2;255;0;0m[%5li.%06i] %s: ", uptime.tv_sec, (int)(uptime.tv_nsec / powl(10, (((int)log10l(uptime.tv_nsec) + 1) - 6))), tag);
     vprintf(text, args);
-    printf("\n");
+    printf("\e[38;2;255;255;255m\n");
     va_end(args);
+
 }
