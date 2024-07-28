@@ -3,6 +3,9 @@
         "log.h": "c",
         "unistd.h": "c",
         "stdio.h": "c",
-        "cmath": "c"
+        "cmath": "c",
+        "vfs.h": "c",
+        "magic.h": "c",
+        "stdlib.h": "c"
     }
 }
