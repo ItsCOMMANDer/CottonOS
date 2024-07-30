@@ -1,9 +1,13 @@
+#include <blkid/blkid.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <unistd.h>
 #include <string.h>
 #include <linux/magic.h>
+#include <errno.h>
+#include <dirent.h> 
 
 #include "util.h"
 #include "log.h"
@@ -18,6 +22,13 @@ int main(int argc, char* argv[]) {
         printf("%s must be run as PID 1\n", argv[0]);
         return -1;
     }
+
+    log_info("INIT VER", "VERSION 0.0.0-4");
+
+    log_error("Log Test", "ERROR Visible");
+    log_warn("Log Test", "WARN Visible");
+    log_info("Log Test", "INFO Visible");
+    log_debug("Log Test", "DEBUG Visible");
 
     log_info("Parameter Info", "Got %i parameters", argc);
     for(int i = 0; i < argc; i++) {
@@ -94,55 +105,107 @@ for me: kernel args 101:
         reboot(RB_HALT_SYSTEM);
     }
 
-    // idk if we need these 2:
-    //mount("proc", "/proc", "proc", 0, NULL);
-    //mount("sysfs", "/sys", "sysfs", 0, NULL);
-    
-    mount("devtmpfs", "/dev", "devtmpfs", 0, NULL);
+    log_info("Parameter Parsing", "Done parsing parameters");
 
     {
-        char* filename = calloc(strlen("/dev/disk/by-uuid/") + strlen(bootfs_uuid) + 1, sizeof(char));
-        strncpy(filename, "/dev/disk/by-uuid/", strlen("/dev/disk/by-uuid/") + 1);
-        strncat(filename, bootfs_uuid, strlen(bootfs_uuid));
-        printf("full path: \"%s\"\n", filename);
-        if(access(filename, F_OK) == 0) {
-            log_info("Bootfs Mount", "Valid bootfs uuid provided");
+        int error;
+        if((error = mount("devtmpfs", "/dev", "devtmpfs", 0, NULL)) != 0) {
+            log_error("DEVFS Mounting", "Failed to mount devfs, code : %i", error);
             //! ERROR?
-            reboot(RB_HALT_SYSTEM);
-        }
-        struct statfs bootfs_stat;
-        statfs(filename, &bootfs_stat);
-        if(bootfs_stat.f_type == EXT4_SUPER_MAGIC) {
-            log_warn("Bootfs Mount", "Bootfs is ext4");
-        }
-        if(mount(filename, "/bootfs", "ext4", 0, NULL) != 0) {
-            log_error("Bootfs Mount", "Erro mounting bootfs"); //! ERRORS HERE!!!
-            //! ERROR?
-            reboot(RB_HALT_SYSTEM);
         }
     }
 
-        {
-        char* filename = calloc(strlen("/dev/disk/by-uuid/") + strlen(rootfs_uuid) + 1, sizeof(char));
-        strncpy(filename, "/dev/disk/by-uuid/", strlen("/dev/disk/by-uuid/") + 1);
-        strncat(filename, bootfs_uuid, strlen(bootfs_uuid));
-        if(access(filename, F_OK) != 0) {
-            log_error("rootfs Mount", "Invalid rootfs uuid provided");
+    log_info("DEVFS Mounting", "Mounted DEVFS");
+
+       {
+        int error;
+        if((error = mount("sysfs", "/sys", "sysfs", 0, NULL)) != 0) {
+            log_error("SYSFS Mounting", "Failed to mount sysfs, code : %i", error);
             //! ERROR?
+        }
+    }
+
+    log_info("SYSFS Mounting", "Mounted SYSFS");
+
+    {
+        int error;
+        if((error = mount("proc", "/proc", "proc", 0, NULL)) != 0) {
+            log_error("PROCFS Mounting", "Failed to mount procfs, code : %i", error);
+            //! ERROR?
+        }
+    }
+
+    log_info("PROCFS Mounting", "Mounted PROCFS");
+
+    {
+        blkid_cache cache;
+        blkid_dev dev;
+        blkid_probe probe;
+        blkid_dev_iterate iterate;
+        const char* blkdev_name;
+        const char* blkdev_uuid;
+
+        int error;
+
+        if((error = blkid_get_cache(&cache, NULL)) < 0) {
+            log_error("BLKID", "BLKID failed to initilize blkid cache with code %i and errno %i", error, errno);
+            log_error("BLKID", "errno string: \"%s\"", strerror(errno));
             reboot(RB_HALT_SYSTEM);
-        } else {
-            struct statfs rootfs_stat;
-            statfs(filename, &rootfs_stat);
-            if(rootfs_stat.f_type != EXT4_SUPER_MAGIC) {
-                log_warn("rootfs Mount", "expected rootfs to be ext4");
-            }
-            if(mount(filename, "/rootfs", "ext4", 0, NULL) != 0) {
-                log_error("rootfs Mount", "Erro mounting rootfs");
+            //! ERROR?
+        }
+
+        log_info("BLKID", "initilized BLKID cache");
+
+        error = 0;
+
+        if((error = blkid_probe_all(cache)) < 0) {
+            log_error("BLKID", "BLKID failed to probe all devices with code %i and errno %i", error, errno);
+            log_error("BLKID", "errno string: \"%s\"", strerror(errno));
+            reboot(RB_HALT_SYSTEM);
+            //! ERROR?
+        }
+
+        log_info("BLKID", "probed all (devices?)");
+
+        iterate = blkid_dev_iterate_begin(cache);
+        while(blkid_dev_next(iterate, &dev) == 0) {
+            blkdev_name = blkid_dev_devname(dev);
+            probe = blkid_new_probe_from_filename(blkdev_name);
+            if(probe == NULL) {
+                log_error("BLKID", "Failed to craete probe for device \"%s\" with errno %i", blkdev_name, errno);
+                log_error("BLKID", "errno string: \"%s\"", strerror(errno));
+                continue;
                 //! ERROR?
                 reboot(RB_HALT_SYSTEM);
             }
+
+            error = 0;
+            if((error = blkid_do_probe(probe)) != 0) {
+                log_error("BLKID", "Failed to do the probeing for device \"%s\" with errno %i", blkdev_name, errno);
+                log_error("BLKID", "errno string: \"%s\"", strerror(errno));
+                blkid_free_probe(probe);
+                continue;
+                //! ERROR?
+                reboot(RB_HALT_SYSTEM);
+            }
+
+            if(blkid_probe_lookup_value(probe, "UUID", &blkdev_uuid, NULL) == 0) {
+                //DO COMPARISON
+                log_info("UUID DISCOVERD", "DEV BLOCK: \"%s\" with UUID \"%s\"", blkdev_name, blkdev_uuid);
+            } else {
+                log_info("BLKID", "Device \"%s\" does not have a uuid (on disk with mbr?)", blkdev_name);
+            }
+
+            blkid_free_probe(probe);
         }
+
+        blkid_dev_iterate_end(iterate);
+        blkid_put_cache(cache);
     }
+
+    
+    log_error("INIT END", "AT THE END OF INIT, IDK, I DONT THINK THIS SHOULD HAVE HAPPEND LOL");
+
 
     reboot(RB_HALT_SYSTEM);
 }

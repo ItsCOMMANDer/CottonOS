@@ -30,7 +30,7 @@ $(TARGET): $(OBJ_FILES)
 
 %.o: %.c
 	$(SILENTMSG) CC $^ -> $@
-	$(SILENTCMD)$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $^
+	$(SILENTCMD)$(CC)  -lblkid $(CFLAGS) $(INCLUDES) -lm -c -o $@ $^
 
 clean:
 	$(SILENTMSG) rm $(OBJ_FILES) $(TARGET)

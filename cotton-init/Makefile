@@ -22,7 +22,7 @@ INCLUDE_DIRS := .
 
 INCLUDES := $(foreach include, $(INCLUDE_DIRS), -I$(include))
 
-LIBS := m
+LIBS := m blkid
 
 LIB := $(foreach library, $(LIBS), -l$(library))
 
@@ -37,12 +37,12 @@ $(TARGET): $(OBJ_FILES)
 	$(SILENTCMD)$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $^
 
 clean:
-	$(SILENTMSG) rm $(OBJ_FILES) $(TARGET) $(INITRD_FILE_NAME) $(INITRD_DIR)/$(TARGET)
-	$(SILENTCMD)rm -f $(OBJ_FILES) $(TARGET) $(INITRD_FILE_NAME) $(INITRD_DIR)/$(TARGET)
+	$(SILENTMSG) rm $(OBJ_FILES) $(TARGET) $(INITRD_FILE_NAME).cpio.gz $(INITRD_DIR)/$(TARGET)
+	$(SILENTCMD)rm -f $(OBJ_FILES) $(TARGET) $(INITRD_FILE_NAME).cpio.gz $(INITRD_DIR)/$(TARGET)
 
 initrd: $(TARGET)
 	cp $(TARGET) $(INITRD_DIR)/init
-	cd $(INITRD_DIR)
-	find . | tail -n +2 | cpio -H newc -ov > $(INITRD_FILE_NAME).cpio
+	cd $(INITRD_DIR); \
+	find . | tail -n +2 | cpio -H newc -ov > $(INITRD_FILE_NAME).cpio; \
 	gzip -f $(INITRD_FILE_NAME).cpio
 	
