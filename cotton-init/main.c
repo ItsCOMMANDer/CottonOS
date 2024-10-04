@@ -75,7 +75,7 @@ bool fsIsSupported(char* fstype) {
 	size_t len = 0;
 	{
 		char tmp;
-		while(read(fd, &tmp, 1) > 0) {len++;}
+		while(read(fd, tmp, 1) > 0) {len++;}
 	}
 
 	// go to the beginning of the file
