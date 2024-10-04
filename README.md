@@ -14,7 +14,7 @@ The main reason I'm making this is fun, but also because i thought it'd be a fun
 
 ## Compilation
 
-To compile the the `init` executable execute `make all`
+To compile the the `init` executable execute `make all` <br>
 To make the initrd just run `make initrd`
 
 ## Contributions
