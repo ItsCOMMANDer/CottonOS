@@ -6,7 +6,7 @@
 
 (This repo really only contains the init system and scripts to make the initrd.cpio.gz)
 
-Cotton OS will be an minimalistic linux distro that provides a custom init system, service managment system and a system managment system that are aiming at being memory efficiant and configurability, whilst offering support with popular software.
+Cotton OS will be an minimalistic linux distro that provides a custom init system, service managment system and a system managment system that are aiming at being memory efficiant and configurability.
 
 ## Motivation
 
