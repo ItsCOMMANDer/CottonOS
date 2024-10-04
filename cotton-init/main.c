@@ -1,20 +1,28 @@
+//INCLUDES
+
+// External Library includes
 #include <blkid/blkid.h>
 
+// Standard library includes
 #include <stdio.h>
 #include <stdlib.h>
 
+// other startard library includes
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
 #include <math.h>
 #include <fcntl.h>
 
+// local headers include
 #include "config.h"
 #include "util.h"
 #include "log.h"
 
+// linux include
 #include <linux/magic.h>
 
+// system includes
 #include <sys/syscall.h>
 #include <sys/reboot.h>
 #include <sys/mount.h>
@@ -22,6 +30,8 @@
 #include <sys/vfs.h>
 #include <sys/utsname.h>
 
+
+// idk why math.h doesnt have this
 #define max(x,y) (x > y ? x : y)
 
 
@@ -52,36 +62,37 @@ void list_directory(const char *path) {
 
 // idk in what file this should belong at this point
 
-
-// assume procfs is mounted in /proc
-
-/*
-/proc/filesystems structure:
-'(nodev)\t fstype \n'
-
-
-*/
-
 bool fsIsSupported(char* fstype) {
+	// open file containg list of supported filesystems
 	int fd = open("/proc/filesystems", O_RDONLY);
-		
+
+	//check if opening file was successful
 	if(fd == -1) {
 		return false;
 	}
 
-	//length including \0
+	// get length including \0
 	size_t len = 0;
 	{
 		char tmp;
 		while(read(fd, &tmp, 1) > 0) {len++;}
 	}
 
+	// go to the beginning of the file
 	lseek(fd, 0, SEEK_SET);
 
+	/*
+	TLDR How this works
+	/proc/filesystems contains a list of filesystems that the kernel can mount int this format:
 
-// THIS CRASHED IDK WHY
-// it works if i compile and run on ubuntu as non-init, fukc linux
-// it was the "int cnt;", it had a bogus value, let this be a lesson for me
+	"(nodev)\tfstype\n" - the "nodev" is in "()" because theyre optional, "\t" and "\n" are the actual tab/newline characters
+
+	we just loop over the file byte-by-byte until we are at the start of "fstype" and check if each character is the same 
+	if characters dont match then we loop until the next fstype, if they do, we continue, if the fstype if at its end (\n) and the given fstype (\0)
+		then its supported
+	when we're at the end of the file without match, its not supported
+	*/
+
 	{
 		char tmp = 0;
 		int cnt = 0; // index in string to compare
@@ -105,18 +116,22 @@ bool fsIsSupported(char* fstype) {
 }
 
 int main(int argc, char* argv[]) {
+	// check if the file is ran as init process
 	if(getpid() != 1) {
 		printf("%s must be run as PID 1\n", argv[0]);
 		return -1;
 	}
 
+	// log the version, i used this to see if qemu actually used the updates version, i have since found a reliable way of ensuring that qemu uses the updated initrd
 	log_info("INIT VER", "VERSION 0.0.0-10dev");
 
+	// test for visibility of different log levels
 	log_error("Log Test", "ERROR Visible");
 	log_warn("Log Test", "WARN Visible");
 	log_info("Log Test", "INFO Visible");
 	log_debug("Log Test", "DEBUG Visible");
 
+	// print some infos about provided commandline parameters
 	log_info("Parameter Info", "Got %i parameters", argc);
 	for(int i = 0; i < argc; i++) {
 		log_info("Parameter Info", "Parameter %i: \"%s\"", i, argv[i]);
@@ -145,6 +160,9 @@ for me: kernel args 101:
 	char* bootfs_uuid = NULL;
 	char* bootfs_fstype = NULL;
 
+	// > if that is followed by the words loop, for, while or do , then you can condense the comment to "parse command line options"
+	// - @therealdwd (discord)
+	// parse command line options
 	for(int i = 1; i < argc; i++) {
 		if(strncmp(argv[i], "--verbosity", max(strlen(argv[i]), 11)) == 0 ) {
 			if(argc - 1 < i + 1) {
@@ -215,6 +233,7 @@ for me: kernel args 101:
 
 	}
 
+	// check if require arguments are provided
 	if(rootfs_uuid == NULL) {
 		log_error("Parameter Parsing", "No rootfs uuid provided");
 		reboot((int)RB_HALT_SYSTEM);
@@ -237,12 +256,14 @@ for me: kernel args 101:
 		strncpy(bootfs_fstype, DEFAULT_BOOTFS_FSTYPE, strlen(DEFAULT_BOOTFS_FSTYPE) + 1);
 	}
 
+	// print provided arguments
 	log_info("Parameter Parsing", "Done parsing parameters");
 	log_info("Parameter Parsing", "ROOTFS UUID: \"%s\"", rootfs_uuid);
 	log_info("Parameter Parsing", "ROOTFS FSTYPE: \"%s\"", rootfs_fstype);
 	log_info("Parameter Parsing", "BOOTFS UUID: \"%s\"", bootfs_uuid);
 	log_info("Parameter Parsing", "BOOTFS FSTYPE: \"%s\"", bootfs_fstype);
 
+	// mounting /dev
 	{
 		int error;
 		if((error = mount("devtmpfs", "/dev", "devtmpfs", 0, NULL)) != 0) {
@@ -254,7 +275,9 @@ for me: kernel args 101:
 
 	log_info("DEVFS Mounting", "Mounted DEVFS");
 
-	   {
+	// mouting /sys
+
+	{
 		int error;
 		if((error = mount("sysfs", "/sys", "sysfs", 0, NULL)) != 0) {
 			log_error("SYSFS Mounting", "Failed to mount sysfs, code : %i", error);
@@ -264,6 +287,8 @@ for me: kernel args 101:
 	}
 
 	log_info("SYSFS Mounting", "Mounted SYSFS");
+
+	// mounting /proc
 
 	{
 		int error;
@@ -275,6 +300,9 @@ for me: kernel args 101:
 	}
 
 	log_info("PROCFS Mounting", "Mounted PROCFS");
+
+
+	// tldr: check what blockdevice matched with given uuid and fstype
 
 	{
 		blkid_cache cache;
@@ -376,6 +404,8 @@ for me: kernel args 101:
 		blkid_put_cache(cache);
 	}
 
+	// check if there is a mathcing block device for root/boot fs
+
 	if(rootfs_blkdev == NULL) {
 		log_error("Partition Scanning", "No Block device with uuid %s for rootfs found", rootfs_blkdev);
 		//! ERROR?
@@ -393,6 +423,8 @@ for me: kernel args 101:
 
 	log_info("Partition Scanning", "Block device for bootfs has been detected as %s", bootfs_blkdev);
 	log_info("Partition Scanning", "bootfs is formatted to %s", bootfs_fstype);
+
+	// check if kernel supports mounting root/boot fs
 
 	{
 		bool fsUnsupported = false;
@@ -418,13 +450,16 @@ for me: kernel args 101:
 
 	log_info("Partition Scanning", "Kernel supports mounting both bootfs and rootfs");
 
+	// preparing stuff to change the root filesystem to rootfs
+
 	umount("/sys");
 	umount("/dev");
 	umount("/proc");
 
 	//switch the rootfs, sys_pivot_root wont work as it doesnt support initrd
 
-	log_error("INIT END", "AT THE END OF INIT, IDK, I DONT THINK THIS SHOULD HAVE HAPPEND LOL");
+
+	// this is so i dont get called out for having skill issues
 
 	free(rootfs_uuid);
 	free(rootfs_blkdev);
@@ -433,6 +468,10 @@ for me: kernel args 101:
 	free(bootfs_blkdev);
 	free(bootfs_uuid);
 	free(bootfs_fstype);
+
+	// we should NEVER have been here
+
+	log_error("INIT END", "AT THE END OF INIT, IDK, I DONT THINK THIS SHOULD HAVE HAPPEND");
 
 	reboot((int)RB_HALT_SYSTEM);
 }
