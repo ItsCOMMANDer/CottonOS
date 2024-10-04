@@ -23,7 +23,7 @@ If you'd like to contribute to CottonOS, think again. It's my homework.
 
 ## cotton-init
 I dont know what else to write here, so ill explain how cotton-init will work.
-I am also sorta making it as i gol. While i have some idea on what i need to do and how i'll do it, the exacpt implementations (or ideas of them) dont exist yet 
+I am also sorta making it as i gol. While i have some idea on what i need to do and how i'll do it, the exact implementations (or ideas of them) dont exist yet 
 
 cotton-init will be the init system of CottonOS. Why did i decide to make my own init system? Idk, for fun?
 
