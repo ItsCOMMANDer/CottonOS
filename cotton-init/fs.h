@@ -1,6 +1,0 @@
-#ifndef COTTON_INIT_INCLUDE_H
-#define COTTON_INIT_INCLUDE_H
-
-
-
-#endif

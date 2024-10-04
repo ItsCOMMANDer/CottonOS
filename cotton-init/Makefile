@@ -7,10 +7,10 @@ INITRD_FILE_NAME := ../initramfs
 TARGET := init
 
 CC := gcc
-CFLAGS := -Wall -Wextra
+CFLAGS := -Wall -Werror -Wextra -Wpedantic -Wconversion -Wshadow -fsanitize=undefined
 
 LD := gcc
-LDFLAGS := -static
+LDFLAGS := -static -static-libubsan
 
 SRC_DIRS := .
 
@@ -22,18 +22,18 @@ INCLUDE_DIRS := .
 
 INCLUDES := $(foreach include, $(INCLUDE_DIRS), -I$(include))
 
-LIBS := m blkid
+LIBS := blkid m ubsan
 
 LIB := $(foreach library, $(LIBS), -l$(library))
 
 all: $(TARGET)
 
 $(TARGET): $(OBJ_FILES)
-	$(SILENTMSG) LD $^ -> $@
-	$(SILENTCMD)$(LD) $(LDFLAGS) -o $@ $^ $(LIB)
+	@echo $(LD) -o $@ $^ $(LDFLAGS) $(LIB)
+	$(SILENTCMD)$(LD) -o $@ $^ $(LDFLAGS) $(LIB)
 
 %.o: %.c
-	$(SILENTMSG) CC $^ -> $@
+	@echo $(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $^
 	$(SILENTCMD)$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $^
 
 clean:
@@ -45,4 +45,4 @@ initrd: $(TARGET)
 	cd $(INITRD_DIR); \
 	find . | tail -n +2 | cpio -H newc -ov > $(INITRD_FILE_NAME).cpio; \
 	gzip -f $(INITRD_FILE_NAME).cpio
-	
+

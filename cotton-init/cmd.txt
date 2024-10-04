@@ -1,0 +1,1 @@
+make clean all initrd && sudo rm ../../vm/mount/boot/initramfs/initramfs.cpio.gz && sudo cp ../initramfs.cpio.gz ../../vm/mount/boot/initramfs/initramfs.cpio.gz && sha512sum ../initramfs.cpio.gz ../../vm/mount/boot/initramfs/initramfs.cpio.gz

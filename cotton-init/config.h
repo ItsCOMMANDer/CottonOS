@@ -1,0 +1,7 @@
+#ifndef COTTON_INIT_CONFIG_H
+#define COTTON_INIT_CONFIG_H
+
+#define DEFAULT_ROOTFS_FSTYPE "ext4"
+#define DEFAULT_BOOTFS_FSTYPE "ext4"
+
+#endif
