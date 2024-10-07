@@ -98,25 +98,22 @@ bool fsIsSupported(char* fstype) {
 	when we're at the end of the file without match, its not supported
 	*/
 
-	{
-		int idx = 0;
-		char tmp = 0;
-		int cnt = 0; // index in string to compare
-		bool fstypeParse = false;
-		while(buffer[idx] != '\0') {
-			if(fstypeParse == true) {
-				if(buffer[idx] == '\n' && fstype[cnt] == '\0') {return true;}
-				if(fstype[cnt] != buffer[idx]) {
-					cnt = 0;
-					fstypeParse = false;
-				} else cnt++;
-			}
-
-			if(buffer[idx] == '(') {idx+=5; continue;}
-			if(buffer[idx] == '\t') fstypeParse = true;
-			if(buffer[idx] == '\n') fstypeParse = false;
-			idx++;
+	int idx = 0;
+	char tmp = 0;
+	int cnt = 0; // index in string to compare
+	bool fstypeParse = false;
+	while(buffer[idx] != '\0') {
+		if(fstypeParse == true) {
+			if(buffer[idx] == '\n' && fstype[cnt] == '\0') {return true;}
+			if(fstype[cnt] != buffer[idx]) {
+				cnt = 0;
+				fstypeParse = false;
+			} else cnt++;
 		}
+		if(buffer[idx] == '(') {idx+=5; continue;}
+		if(buffer[idx] == '\t') fstypeParse = true;
+		if(buffer[idx] == '\n') fstypeParse = false;
+		idx++;
 	}
 
 	free(buffer);
