@@ -75,11 +75,16 @@ bool fsIsSupported(char* fstype) {
 	size_t len = 0;
 	{
 		char tmp;
-		while(read(fd, tmp, 1) > 0) {len++;}
+		while(read(fd, &tmp, 1) > 0) {len++;}
 	}
 
-	// go to the beginning of the file
 	lseek(fd, 0, SEEK_SET);
+
+	char* buffer = calloc(len, 1);
+
+	read(fd, buffer, len);
+
+	close(fd);
 
 	/*
 	TLDR How this works
@@ -94,24 +99,28 @@ bool fsIsSupported(char* fstype) {
 	*/
 
 	{
+		int idx = 0;
 		char tmp = 0;
 		int cnt = 0; // index in string to compare
 		bool fstypeParse = false;
-		while(read(fd, &tmp, 1) > 0) {
+		while(buffer[idx] != '\0') {
 			if(fstypeParse == true) {
-				if(tmp == '\n' && fstype[cnt] == '\0') {close(fd); return true;}
-				if(fstype[cnt] != tmp) {
+				if(buffer[idx] == '\n' && fstype[cnt] == '\0') {return true;}
+				if(fstype[cnt] != buffer[idx]) {
 					cnt = 0;
 					fstypeParse = false;
 				} else cnt++;
 			}
 
-			if(tmp == '\t') fstypeParse = true;
-			if(tmp == '\n') fstypeParse = false;
+			if(buffer[idx] == '(') {idx+=5; continue;}
+			if(buffer[idx] == '\t') fstypeParse = true;
+			if(buffer[idx] == '\n') fstypeParse = false;
+			idx++;
 		}
 	}
 
-	close(fd);
+	free(buffer);
+
 	return false;
 }
 
@@ -452,12 +461,66 @@ for me: kernel args 101:
 
 	// preparing stuff to change the root filesystem to rootfs
 
-	umount("/sys");
-	umount("/dev");
-	umount("/proc");
+	mount(rootfs_blkdev, "/rootfs", rootfs_fstype, 0, NULL);
 
-	//switch the rootfs, sys_pivot_root wont work as it doesnt support initrd
+	mount("/dev", "/rootfs/dev", "devtmpfs", MS_MOVE, NULL);
+	mount("/sys", "/rootfs/sys", "sysfs", MS_MOVE, NULL);
+	mount("/proc", "/rootfs/proc", "proc", MS_MOVE, NULL);
 
+	chdir("/rootfs");
+
+	int initrdRoot = open("/");
+
+	mount("/rootfs", "/", rootfs_fstype, MS_MOVE, NULL);
+
+	chroot(".");
+
+	chdir("/");
+
+	switch(fork()) {
+		case 0:
+			struct statfs initrdRootStat; 
+			if(fstatfs(initrdRoot, &initrdRootStat) == 0 &&
+				(initrdRootStat.f_type == STATFS_RAMFS_MAGIC ||
+				initrdRootStat.f_type == STATFS_TMPFS_MAGIC)) {
+					//rm -rf initrdRoot
+			}
+			close(initrdRoot);
+			exit(0);
+			break; // idk why, we are never gonna be here anyway
+		case -1:
+			break;
+		default:
+			close(initrdRoot);
+			break;
+	}
+
+	/*
+	
+	Self note
+
+	How to switch rootfs:
+
+	mount /proc,/dev and /sys to /rootfs/{proc, dev, sys} using MS_MOVE
+
+	chdir /rootfs
+
+	get old_root (ramfs root) fd
+
+	mount /rootfs to / using MS_MOVE
+	
+	chroot .
+	chdir /
+
+	fork:
+		child:
+			rm -rf / rootfs using old_root fd (if tmpfs/ramfs)
+			close old_root fd
+			sys_exit
+		parent:
+			close old_root fd
+
+	*/
 
 	// this is so i dont get called out for having skill issues
 
