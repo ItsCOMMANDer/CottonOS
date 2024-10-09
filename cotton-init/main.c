@@ -466,25 +466,6 @@ for me: kernel args 101:
 		}
 	}
 
-	//SHELL
-	while(1) {
-	pid_t cPID;
-		switch((cPID = fork())) {
-			case 0: {
-				execl("/bin/dash", "dash", NULL);
-
-				exit(0);
-			}
-
-			default: {
-				int status;
-				waitpid(cPID, &status, 0);
-				while(WIFEXITED(status) == false) {waitpid(cPID, &status, 0);}
-				log_info("SHELL", "SHELL ENDED");
-				break;
-			}
-		}
-	}
 	
 
 
