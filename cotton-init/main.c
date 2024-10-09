@@ -18,6 +18,7 @@
 #include "config.h"
 #include "util.h"
 #include "log.h"
+#include "fs.h"
 
 // linux include
 #include <linux/magic.h>
@@ -29,6 +30,8 @@
 #include <sys/statfs.h>
 #include <sys/vfs.h>
 #include <sys/utsname.h>
+
+#include <sys/wait.h>
 
 
 // idk why math.h doesnt have this
@@ -60,66 +63,7 @@ void list_directory(const char *path) {
     }
 }
 
-// idk in what file this should belong at this point
 
-bool fsIsSupported(char* fstype) {
-	// open file containg list of supported filesystems
-	int fd = open("/proc/filesystems", O_RDONLY);
-
-	//check if opening file was successful
-	if(fd == -1) {
-		return false;
-	}
-
-	// get length including \0
-	size_t len = 0;
-	{
-		char tmp;
-		while(read(fd, &tmp, 1) > 0) {len++;}
-	}
-
-	lseek(fd, 0, SEEK_SET);
-
-	char* buffer = calloc(len, 1);
-
-	read(fd, buffer, len);
-
-	close(fd);
-
-	/*
-	TLDR How this works
-	/proc/filesystems contains a list of filesystems that the kernel can mount int this format:
-
-	"(nodev)\tfstype\n" - the "nodev" is in "()" because theyre optional, "\t" and "\n" are the actual tab/newline characters
-
-	we just loop over the file byte-by-byte until we are at the start of "fstype" and check if each character is the same 
-	if characters dont match then we loop until the next fstype, if they do, we continue, if the fstype if at its end (\n) and the given fstype (\0)
-		then its supported
-	when we're at the end of the file without match, its not supported
-	*/
-
-	int idx = 0;
-	char tmp = 0;
-	int cnt = 0; // index in string to compare
-	bool fstypeParse = false;
-	while(buffer[idx] != '\0') {
-		if(fstypeParse == true) {
-			if(buffer[idx] == '\n' && fstype[cnt] == '\0') {return true;}
-			if(fstype[cnt] != buffer[idx]) {
-				cnt = 0;
-				fstypeParse = false;
-			} else cnt++;
-		}
-		if(buffer[idx] == '(') {idx+=5; continue;}
-		if(buffer[idx] == '\t') fstypeParse = true;
-		if(buffer[idx] == '\n') fstypeParse = false;
-		idx++;
-	}
-
-	free(buffer);
-
-	return false;
-}
 
 int main(int argc, char* argv[]) {
 	// check if the file is ran as init process
@@ -434,14 +378,14 @@ for me: kernel args 101:
 
 	{
 		bool fsUnsupported = false;
-		if(fsIsSupported(rootfs_fstype) == false) {
+		if(fs_fsIsSupported(rootfs_fstype) == false) {
 			struct utsname kernelInfo;
 			uname(&kernelInfo);
 			log_error("Partition Scanning", "Kernel Revision %s does not support mounting %s filesystems", kernelInfo.release, rootfs_fstype);
 			fsUnsupported = true;
 		}
 
-		if(fsIsSupported(bootfs_fstype) == false) {
+		if(fs_fsIsSupported(bootfs_fstype) == false) {
 			struct utsname kernelInfo;
 			uname(&kernelInfo);
 			log_error("Partition Scanning", "Kernel Revision %s does not support mounting %s filesystems", kernelInfo.release, bootfs_fstype);
@@ -455,42 +399,6 @@ for me: kernel args 101:
 	}
 
 	log_info("Partition Scanning", "Kernel supports mounting both bootfs and rootfs");
-
-	// preparing stuff to change the root filesystem to rootfs
-
-	mount(rootfs_blkdev, "/rootfs", rootfs_fstype, 0, NULL);
-
-	mount("/dev", "/rootfs/dev", "devtmpfs", MS_MOVE, NULL);
-	mount("/sys", "/rootfs/sys", "sysfs", MS_MOVE, NULL);
-	mount("/proc", "/rootfs/proc", "proc", MS_MOVE, NULL);
-
-	chdir("/rootfs");
-
-	int initrdRoot = open("/");
-
-	mount("/rootfs", "/", rootfs_fstype, MS_MOVE, NULL);
-
-	chroot(".");
-
-	chdir("/");
-
-	switch(fork()) {
-		case 0:
-			struct statfs initrdRootStat; 
-			if(fstatfs(initrdRoot, &initrdRootStat) == 0 &&
-				(initrdRootStat.f_type == STATFS_RAMFS_MAGIC ||
-				initrdRootStat.f_type == STATFS_TMPFS_MAGIC)) {
-					//rm -rf initrdRoot
-			}
-			close(initrdRoot);
-			exit(0);
-			break; // idk why, we are never gonna be here anyway
-		case -1:
-			break;
-		default:
-			close(initrdRoot);
-			break;
-	}
 
 	/*
 	
@@ -510,7 +418,7 @@ for me: kernel args 101:
 	chdir /
 
 	fork:
-		child:
+		child (fork return val = 0):
 			rm -rf / rootfs using old_root fd (if tmpfs/ramfs)
 			close old_root fd
 			sys_exit
@@ -518,6 +426,67 @@ for me: kernel args 101:
 			close old_root fd
 
 	*/
+
+	// preparing stuff to change the root filesystem to rootfs
+
+	mount(rootfs_blkdev, "/rootfs", rootfs_fstype, 0, NULL);
+
+	mount("/dev", "/rootfs/dev", "devtmpfs", MS_MOVE, NULL);
+	mount("/sys", "/rootfs/sys", "sysfs", MS_MOVE, NULL);
+	mount("/proc", "/rootfs/proc", "proc", MS_MOVE, NULL);
+
+	chdir("/rootfs");
+
+	int initrdRoot = open("/", O_RDONLY);
+
+	mount("/rootfs", "/", rootfs_fstype, MS_MOVE, NULL);
+
+	chroot(".");
+
+	chdir("/");
+
+	switch(fork()) {
+		case 0: {
+			struct statfs initrdRootStat;
+			if(fstatfs(initrdRoot, &initrdRootStat) == 0 &&
+				(initrdRootStat.f_type == RAMFS_MAGIC ||
+				initrdRootStat.f_type == TMPFS_MAGIC)) {
+					fs_removeRecusrivly(initrdRoot);
+			}
+			close(initrdRoot);
+			exit(0);
+			break; // idk why, we are never gonna be here anyway
+		}
+
+		case -1: break;
+		
+		default: {
+			close(initrdRoot);
+			break;
+		}
+	}
+
+	//SHELL
+	while(1) {
+	pid_t cPID;
+		switch((cPID = fork())) {
+			case 0: {
+				execl("/bin/dash", "dash", NULL);
+
+				exit(0);
+			}
+
+			default: {
+				int status;
+				waitpid(cPID, &status, 0);
+				while(WIFEXITED(status) == false) {waitpid(cPID, &status, 0);}
+				log_info("SHELL", "SHELL ENDED");
+				break;
+			}
+		}
+	}
+	
+
 
 	// this is so i dont get called out for having skill issues
 
@@ -532,6 +501,9 @@ for me: kernel args 101:
 	// we should NEVER have been here
 
 	log_error("INIT END", "AT THE END OF INIT, IDK, I DONT THINK THIS SHOULD HAVE HAPPEND");
+	log_error("INIT END", "rebooting in 5 seconds");
 
-	reboot((int)RB_HALT_SYSTEM);
+	sleep(5);
+
+	reboot((int)RB_POWER_OFF);
 }
