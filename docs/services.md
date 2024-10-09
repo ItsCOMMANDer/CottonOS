@@ -16,7 +16,7 @@ Execute="/bin/service_example" --example-flag "test;test2" -e "example"
 
 Logfile=/var/example/log.txt
 
-Requires="Internet.service" "sql_server.service" "something_else.service"
+Requires="Internet.service" "sql_server.service" "something_else.service" # Only start this service if the required services are running
 
 
 Start=Manual # Possible values are Manual|On-Boot
@@ -30,7 +30,7 @@ On-Fail-Death=Restart # Possible Options are Restart|Northing
 # like backups, they dont need to run in the background. They need to make a backup, and end
 
 Schedule=Manual
-# Schedule=Manual - Restart manually
+# Schedule=Manual - Restart manually, no Schedule
 # Schedule=Hourly 2 - Restart ever 2 hours after start of the service -> service started 14:30, next start 16:30
 # Schedule=Daily 3 - every 3 days after the start of the service -> service started 25.04.2024 20:00, next start 27.04.2024 20:00
 # Schedule=Monthly 1 - every month after the start of the service started -> started 06.03.2024 12:00, next start on 06.04.2024 12:00
