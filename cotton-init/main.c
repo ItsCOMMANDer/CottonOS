@@ -357,13 +357,13 @@ for me: kernel args 101:
 	// check if there is a mathcing block device for root/boot fs
 
 	if(rootfs_blkdev == NULL) {
-		log_error("Partition Scanning", "No Block device with uuid %s for rootfs found", rootfs_blkdev);
+		log_error("Partition Scanning", "No Block device with uuid %s for rootfs found", rootfs_uuid);
 		//! ERROR?
 		reboot((int)RB_HALT_SYSTEM);
 	}
 
 	if(bootfs_blkdev == NULL) {
-		log_error("Partition Scanning", "No Block device with uuid %s for bootfs found", bootfs_blkdev);
+		log_error("Partition Scanning", "No Block device with uuid %s for bootfs found", bootfs_uuid);
 		//! ERROR?
 		reboot((int)RB_HALT_SYSTEM);
 	}

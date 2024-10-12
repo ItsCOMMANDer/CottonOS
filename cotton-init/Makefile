@@ -7,9 +7,9 @@ INITRD_FILE_NAME := ../initramfs
 TARGET := init
 
 CC := gcc
-CFLAGS := -Wall -Werror -Wextra -Wpedantic -Wconversion -Wshadow -fsanitize=undefined
-
 LD := gcc
+
+CFLAGS := -Wall -Werror -Wextra -Wpedantic -Wconversion -Wshadow -fsanitize=undefined -g
 LDFLAGS := -static -static-libubsan
 
 SRC_DIRS := .
@@ -29,11 +29,11 @@ LIB := $(foreach library, $(LIBS), -l$(library))
 all: $(TARGET)
 
 $(TARGET): $(OBJ_FILES)
-	@echo $(LD) -o $@ $^ $(LDFLAGS) $(LIB)
+	$(SILENTMSG) $(LD) -o $@ $^ $(LDFLAGS) $(LIB)
 	$(SILENTCMD)$(LD) -o $@ $^ $(LDFLAGS) $(LIB)
 
 %.o: %.c
-	@echo $(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $^
+	$(SILENTMSG) $(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $^
 	$(SILENTCMD)$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $^
 
 clean:
